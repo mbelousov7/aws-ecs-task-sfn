@@ -5,11 +5,11 @@ Latest versions must be at the top!
 
 ## [1.2.0] - 2023-06-15
 
-- add alarm config (APPA-7752)
+- add alarm config
 
 ## [1.1.3] - 2023-06-15
 
-- add default sfn log config (APPA-7524)
+- add default sfn log config
 
 ## [1.1.2] - 2023-06-07
 
