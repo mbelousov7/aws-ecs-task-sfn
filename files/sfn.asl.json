@@ -1,0 +1,79 @@
+{
+  "StartAt": "Run Task",
+  "States": {
+    "Run Task": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::ecs:runTask.sync",
+      "Parameters": {
+        "LaunchType": "FARGATE",
+        "Cluster": "${cluster_arn}",
+        "TaskDefinition": "${task_definition_arn}",
+        "NetworkConfiguration": {
+          "AwsvpcConfiguration": {
+            "SecurityGroups": [
+              "${security_group_id}"
+            ],
+            "Subnets" : ${jsonencode([for id in subnet_ids : "${id}"])}
+          }
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": ${retry_config.IntervalSeconds},
+          "MaxAttempts": ${retry_config.MaxAttempts},
+          "BackoffRate": ${retry_config.BackoffRate}
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "ResultPath": "$.errorInfo",
+          "Next": "Raise Alarm"
+        }
+      ],
+      "Next": "Done"
+    },
+    "Raise Alarm": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${alarm_topic_arn}",
+        "Message":  {
+          "AlarmName":"${alarm_name}",
+          "AlarmDescription":"${alarm_dscription}",
+          "NewStateValue":"ALARM",
+          "NewStateReason": "Fargate task failed to invoke",
+          "StateChangeTime.$":"$$.Execution.StartTime",
+          "Region":"${aws_region_name}",
+          "OldStateValue":"OK",
+          "Trigger":{
+            "MetricName":"${alarm_metric_name}",
+            "Namespace":"${alarm_namespace}",
+            "Dimensions":[
+              {
+                "value":"${environment}",
+                "name":"tr:environment-type"
+              },
+              {
+                "value":"${asset_id}",
+                "name":"tr:application-asset-insight-id"
+              }]
+          }
+        }
+      },
+      "Next": "Execution Failed"
+    },
+    "Done": {
+      "Type": "Succeed"
+    },
+    "Execution Failed": {
+      "Type": "Fail",
+      "Comment": "This step indicates the failed execution after publishing a failure alarm"
+    }
+  }
+}
